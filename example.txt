@@ -1,17 +1,14 @@
-/* syntax error :
-*/
-int main(){
+int main()
+{
 	int i;
 	int j;
-	int a;
-	int b;
-	int c;
 	
-	i = 3;
-	j = 4;
-	a = i + j + 1;
-	b = i * j * 2;
-	b = 111-b;
-	c = b/(1111-a);
-	output(c);
+	i=0;
+	j=0;
+	while (i){
+		i=i+1;
+		j=j+1;
+	}
+	output(i);
+	output(j);
 }

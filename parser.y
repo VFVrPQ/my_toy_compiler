@@ -38,11 +38,11 @@
    calling an (NIdentifier*). It makes the compiler happy.
  */
 %type <ident> ident type_specifier
-%type <block> program declaration_list stmts
+%type <block> program declaration_list stmts selection_stmt iteration_stmt bra_stmts
 %type <varvec> params param_list
 %type <exprvec> args
 %type <stmt>  declaration var_declaration extern_declaration com_declaration fun_declaration
-%type <stmt> stmt expression_stmt selection_stmt iteration_stmt return_stmt param
+%type <stmt> stmt expression_stmt return_stmt param
 %type <expr> expression numeric
 %type <token> comparison
 
@@ -96,13 +96,16 @@ param: type_specifier ident { $$ = new NVariableDeclaration(*$1,*$2); }
 stmts: stmt { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
     | stmts stmt { $1->statements.push_back($<stmt>2); }
 	| stmts com_declaration { $$ = $1; } 
+    | selection_stmt
+    | iteration_stmt
+    ;
+
+bra_stmts: TLBRACE stmts TRBRACE { $$ = $2; }
     ;
 
 stmt: var_declaration 
     | expression_stmt 
     | TLBRACE stmt TRBRACE { $$ = $2; }
-    | selection_stmt
-    | iteration_stmt
     | return_stmt
     | /*空*/ { $$ = new NStatement();}
     ;
@@ -111,11 +114,11 @@ expression_stmt: expression TSEMICOLON { $$ = new NExpressionStatement(*$1); }
     | TSEMICOLON { $$ = new NStatement(); }
     ;
 
-selection_stmt: TIF TLPAREN expression TRPAREN stmt { $$ = new NSelectionStatement(*$3,*$5); }
-    | TIF TLPAREN expression TRPAREN stmt TELSE stmt { $$ = new NSelectionStatement(*$3,*$5,*$7); } 
+selection_stmt: TIF TLPAREN expression TRPAREN bra_stmts { $$ = new NSelectionStatement(*$3,*$5); }
+    | TIF TLPAREN expression TRPAREN bra_stmts TELSE bra_stmts { $$ = new NSelectionStatement(*$3,*$5,*$7); } 
     ;
 
-iteration_stmt: TWHILE TLPAREN expression TRPAREN stmt { $$ = new NIterationStatement(*$3,*$5); }
+iteration_stmt: TWHILE TLPAREN expression TRPAREN bra_stmts { $$ = new NIterationStatement(*$3,*$<block>5); }
     ;
 
 return_stmt: TRETURN TSEMICOLON { $$ = new NReturnStatement(); }
@@ -132,6 +135,7 @@ expression: ident TEQUAL expression { $$ = new NAssignment(*$1, *$3); }
     | expression TMUL expression { $$ = new NBinaryOperator(*$1, $2, *$3); }
     | expression TDIV expression { $$ = new NBinaryOperator(*$1, $2, *$3); }
 	| TLPAREN expression TRPAREN { $$ = $2; }
+    | TMINUS expression { $$ = new NBinaryOperator(0, $1, *$2); }
 	;
     
 numeric: TINTEGER { $$ = new NInteger(atol($1->c_str())); }

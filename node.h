@@ -61,6 +61,8 @@ public:
 	NExpression& rhs;
 	NBinaryOperator(NExpression& lhs, int op, NExpression& rhs) :
 		lhs(lhs), rhs(rhs), op(op) { }
+	NBinaryOperator(long long l, int op, NExpression& rhs) :
+		lhs(*(new NInteger(l))),rhs(rhs), op(op) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
@@ -98,24 +100,27 @@ public:
 };
 
 //new
-class NSelectionStatement : public NStatement {
+class NSelectionStatement : public NBlock {
 public:
-	NExpression& expression;
-	NStatement& statement1;
-	NStatement  statement2;
-	NSelectionStatement(NExpression& expression, NStatement& statement1) :
-		expression(expression), statement1(statement1) {}
-	NSelectionStatement(NExpression& expression, NStatement& statement1, NStatement statement2) :
-		expression(expression), statement1(statement1),statement2(statement2) {}	
+	NExpression& condition;
+	NBlock& trueBlock;
+	NBlock  falseBlock;
+	NSelectionStatement(NExpression& condition, NBlock& trueBlock) :
+		condition(condition), trueBlock(trueBlock) {}
+	NSelectionStatement(NExpression& condition, NBlock& trueBlock, NBlock falseBlock) :
+		condition(condition), trueBlock(trueBlock),falseBlock(falseBlock) {}	
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+
 };
 
 //new
-class NIterationStatement : public NStatement {
+class NIterationStatement : public NBlock {
 public:
 	NExpression& expression;
-	NStatement& statement;
-	NIterationStatement(NExpression& expression, NStatement& statement) :
-		expression(expression), statement(statement) {}
+	NBlock& block;
+	NIterationStatement(NExpression& expression, NBlock& block) :
+		expression(expression), block(block) {}
+	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 //new
 class NVariableDeclaration : public NStatement {

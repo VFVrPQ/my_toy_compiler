@@ -14,12 +14,12 @@ Function* myMainFunction;
 /* Compile the AST into a module */
 void CodeGenContext::generateCode(NBlock& root)
 {
-		std::cout << "Generating code...\n";
+	std::cout << "Generating code...\n";
 	
 	/* Create the top level interpreter function to call as entry */
 	vector<Type*> argTypes;
 	FunctionType *ftype = FunctionType::get(Type::getVoidTy(MyContext), makeArrayRef(argTypes), false);
-	mainFunction = Function::Create(ftype, GlobalValue::InternalLinkage, "main", module);
+	mainFunction = Function::Create(ftype, GlobalValue::InternalLinkage, "bigmain", module);
 	BasicBlock *bblock = BasicBlock::Create(MyContext, "entry", mainFunction, 0);
 	
 	/* Push a new variable/block context */
@@ -41,11 +41,20 @@ void CodeGenContext::generateCode(NBlock& root)
 
 /* Executes the AST by running the main function */
 GenericValue CodeGenContext::runCode() {
+	if (mainFunctionNum == 0){
+		cout<< "ERROR: no main fun" <<endl;
+		exit(0);
+	}else 
+	if (mainFunctionNum != 1){
+		cout<< "ERROR: too many main fun" <<endl;
+		exit(0);
+	}
+
 	std::cout << "Running code...\n";
 	ExecutionEngine *ee = EngineBuilder( unique_ptr<Module>(module) ).create();
 	ee->finalizeObject();
 	vector<GenericValue> noargs;
-	GenericValue v = ee->runFunction(mainFunction, noargs);
+	GenericValue v = ee->runFunction(myMainFunction, noargs);
 	std::cout << "Code was run.\n";
 	return v;
 }
@@ -161,6 +170,67 @@ Value* NReturnStatement::codeGen(CodeGenContext& context)
 	Value *returnValue = expression.codeGen(context);
 	context.setCurrentReturnValue(returnValue);
 	return returnValue;
+}
+
+Value* NIterationStatement::codeGen(CodeGenContext& context)
+{
+	std::cout << "Generating while code for " << typeid(expression).name() << endl;
+
+    return nullptr;
+}
+
+Value* NSelectionStatement::codeGen(CodeGenContext& context)
+{	
+	cout << "Generating if statement" << endl;
+    Value* condValue = this->condition.codeGen(context);
+    if( !condValue )
+        return nullptr;
+
+    condValue = CastToBoolean(context, condValue);
+
+    Function* theFunction = context.builder.GetInsertBlock()->getParent();      // the function where if statement is in
+
+    BasicBlock *thenBB = BasicBlock::Create(context.llvmContext, "then", theFunction);
+    BasicBlock *falseBB = BasicBlock::Create(context.llvmContext, "else");
+    BasicBlock *mergeBB = BasicBlock::Create(context.llvmContext, "ifcont");
+
+    if( this->falseBlock ){
+        context.builder.CreateCondBr(condValue, thenBB, falseBB);
+    } else{
+        context.builder.CreateCondBr(condValue, thenBB, mergeBB);
+    }
+
+    context.builder.SetInsertPoint(thenBB);
+
+    context.pushBlock(thenBB);
+
+    this->trueBlock->codeGen(context);
+
+    context.popBlock();
+
+    thenBB = context.builder.GetInsertBlock();
+
+    if( thenBB->getTerminator() == nullptr ){       //
+        context.builder.CreateBr(mergeBB);
+    }
+
+    if( this->falseBlock ){
+        theFunction->getBasicBlockList().push_back(falseBB);    //
+        context.builder.SetInsertPoint(falseBB);            //
+
+        context.pushBlock(thenBB);
+
+        this->falseBlock->codeGen(context);
+
+        context.popBlock();
+
+        context.builder.CreateBr(mergeBB);
+    }
+
+    theFunction->getBasicBlockList().push_back(mergeBB);        //
+    context.builder.SetInsertPoint(mergeBB);        //
+
+    return nullptr;
 }
 
 Value* NVariableDeclaration::codeGen(CodeGenContext& context)
