@@ -90,12 +90,34 @@ public:
 
 class NReturnStatement : public NStatement {
 public:
-	NExpression& expression;
-	NReturnStatement(NExpression& expression) : 
+	NExpression expression;
+	NReturnStatement() {}
+	NReturnStatement(NExpression expression) : 
 		expression(expression) { }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
+//new
+class NSelectionStatement : public NStatement {
+public:
+	NExpression& expression;
+	NStatement& statement1;
+	NStatement  statement2;
+	NSelectionStatement(NExpression& expression, NStatement& statement1) :
+		expression(expression), statement1(statement1) {}
+	NSelectionStatement(NExpression& expression, NStatement& statement1, NStatement statement2) :
+		expression(expression), statement1(statement1),statement2(statement2) {}	
+};
+
+//new
+class NIterationStatement : public NStatement {
+public:
+	NExpression& expression;
+	NStatement& statement;
+	NIterationStatement(NExpression& expression, NStatement& statement) :
+		expression(expression), statement(statement) {}
+};
+//new
 class NVariableDeclaration : public NStatement {
 public:
 	const NIdentifier& type;
