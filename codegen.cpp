@@ -6,10 +6,15 @@
 using namespace std;
 
 
+static Type *typeOf(const NIdentifier& type) ;
+
+int flag = 0;
+int mainFunctionNum = 0;
+Function* myMainFunction;
 /* Compile the AST into a module */
 void CodeGenContext::generateCode(NBlock& root)
 {
-	std::cout << "Generating code...\n";
+		std::cout << "Generating code...\n";
 	
 	/* Create the top level interpreter function to call as entry */
 	vector<Type*> argTypes;
@@ -100,6 +105,7 @@ Value* NMethodCall::codeGen(CodeGenContext& context)
 Value* NBinaryOperator::codeGen(CodeGenContext& context)
 {
 	std::cout << "Creating binary operation " << op << endl;
+	
 	Instruction::BinaryOps instr;
 	switch (op) {
 		case TPLUS: 	instr = Instruction::Add; goto math;
@@ -120,7 +126,8 @@ Value* NAssignment::codeGen(CodeGenContext& context)
 {
 	std::cout << "Creating assignment for " << lhs.name << endl;
 	if (context.locals().find(lhs.name) == context.locals().end()) {
-		std::cerr << "undeclared variable " << lhs.name << endl;
+		std::cerr << endl << "ERROR: undeclared variable " << lhs.name << endl;
+		exit(0);
 		return NULL;
 	}
 	return new StoreInst(rhs.codeGen(context), context.locals()[lhs.name], false, context.currentBlock());
@@ -184,6 +191,7 @@ Value* NExternDeclaration::codeGen(CodeGenContext& context)
     }
     FunctionType *ftype = FunctionType::get(typeOf(type), makeArrayRef(argTypes), false);
     Function *function = Function::Create(ftype, GlobalValue::ExternalLinkage, id.name.c_str(), context.module);
+
     return function;
 }
 
@@ -198,6 +206,10 @@ Value* NFunctionDeclaration::codeGen(CodeGenContext& context)
 	Function *function = Function::Create(ftype, GlobalValue::InternalLinkage, id.name.c_str(), context.module);
 	BasicBlock *bblock = BasicBlock::Create(MyContext, "entry", function, 0);
 
+	if (id.name == "main" && !flag){
+		myMainFunction = function;
+		mainFunctionNum ++;
+	}
 	context.pushBlock(bblock);
 
 	Function::arg_iterator argsValues = function->arg_begin();

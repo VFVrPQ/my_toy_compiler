@@ -18,7 +18,6 @@
 "else"                          return TOKEN(TELSE);
 "if"                            return TOKEN(TIF);
 "while"                         return TOKEN(TWHILE);
-"void"                          return TOKEN(TVOID);
 
 [a-zA-Z_][a-zA-Z0-9_]*          printf("lineno=%d\n",yylineno);SAVE_TOKEN; return TIDENTIFIER;
 [0-9]+\.[0-9]* 			        SAVE_TOKEN; return TDOUBLE;

@@ -15,4 +15,4 @@ void main(void)
 	b = -b;
 	c = b/-a;
 	output(c);
-}
+}9

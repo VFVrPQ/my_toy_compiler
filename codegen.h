@@ -23,7 +23,7 @@ using namespace llvm;
 class NBlock;
 
 static LLVMContext MyContext;
-
+static LLVMContext MyContext2;
 class CodeGenBlock {
 public:
     BasicBlock *block;

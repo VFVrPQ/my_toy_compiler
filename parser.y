@@ -26,7 +26,7 @@
    match our tokens.l lex file. We also define the node type
    they represent.
  */
-%token <string> TIDENTIFIER TINTEGER TDOUBLE TCOMMENT TINT TVOID
+%token <string> TIDENTIFIER TINTEGER TDOUBLE TCOMMENT TINT
 %token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT TSEMICOLON
 %token <token> TPLUS TMINUS TMUL TDIV
@@ -37,11 +37,15 @@
    we call an ident (defined by union type ident) we are really
    calling an (NIdentifier*). It makes the compiler happy.
  */
-%type <ident> ident type_specifier myvoid
+%type <ident> ident type_specifier
 %type <block> program declaration_list stmts
 %type <varvec> params param_list
-%type <stmt>  declaration var_declaration com_declaration fun_declaration
-%type <stmt> stmt param
+%type <exprvec> args
+%type <stmt>  declaration var_declaration extern_declaration com_declaration fun_declaration
+%type <stmt> stmt expression_stmt selection_stmt iteration_stmt return_stmt param
+%type <expr> expression numeric
+%type <token> comparison
+
 /* Operator precedence for mathematical operators */
 %left TPLUS TMINUS
 %left TMUL TDIV
@@ -59,6 +63,7 @@ declaration_list: declaration_list declaration { $1->statements.push_back($<stmt
     ;
     
 declaration: var_declaration 
+    | extern_declaration
     | com_declaration
     | fun_declaration
     ;
@@ -67,6 +72,9 @@ declaration: var_declaration
 var_declaration: type_specifier ident TSEMICOLON { $$ = new NVariableDeclaration(*$<ident>1, *$2); }
 	;
 
+extern_declaration: TEXTERN type_specifier ident TLPAREN params TRPAREN TSEMICOLON { $$ = new NExternDeclaration(*$2, *$3, *$5); }
+    ;
+
 com_declaration: TCOMMENT { $$ = new NStatement(); }
     ;
 
@@ -74,12 +82,9 @@ fun_declaration: type_specifier ident TLPAREN params TRPAREN TLBRACE stmts TRBRA
     ;
 
 params: param_list
-    | myvoid { $$ = new VariableList(); }
     | /*blank*/ { $$ = new VariableList(); }
     ;
     
-myvoid: TVOID { $$ = new NIdentifier(*$1); }
-    ;
 
 param_list: param_list TCOMMA param { $$ = $1; $$->push_back($<var_decl>3); }
     | param { $$ = new VariableList(); $$->push_back($<var_decl>1); }
@@ -94,9 +99,51 @@ stmts: stmt { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
     ;
 
 stmt: var_declaration 
+    | expression_stmt 
     | TLBRACE stmt TRBRACE { $$ = $2; }
+    | selection_stmt
+    | iteration_stmt
+    | return_stmt
     | /*空*/ { $$ = new NStatement();}
     ;
+
+expression_stmt: expression TSEMICOLON { $$ = new NExpressionStatement(*$1); }
+    | TSEMICOLON { $$ = new NStatement(); }
+    ;
+
+selection_stmt: TIF TLPAREN expression TRPAREN stmt { $$ = new NSelectionStatement(*$3,*$5); }
+    | TIF TLPAREN expression TRPAREN stmt TELSE stmt { $$ = new NSelectionStatement(*$3,*$5,*$7); } 
+    ;
+
+iteration_stmt: TWHILE TLPAREN expression TRPAREN stmt { $$ = new NIterationStatement(*$3,*$5); }
+    ;
+
+return_stmt: TRETURN TSEMICOLON { $$ = new NReturnStatement(); }
+    | TRETURN expression TSEMICOLON {$$ = new NReturnStatement(*$2); }
+    ;
+
+expression: ident TEQUAL expression { $$ = new NAssignment(*$1, *$3); }
+    | ident TLPAREN args TRPAREN {  $$ = new NMethodCall(*$1, *$3); }
+    | ident { $<ident>$ = $1; }
+	| numeric 
+	| expression comparison expression { $$ = new NBinaryOperator(*$1, $2, *$3); }
+    | expression TPLUS expression { $$ = new NBinaryOperator(*$1, $2, *$3); }
+    | expression TMINUS expression { $$ = new NBinaryOperator(*$1, $2, *$3); }
+    | expression TMUL expression { $$ = new NBinaryOperator(*$1, $2, *$3); }
+    | expression TDIV expression { $$ = new NBinaryOperator(*$1, $2, *$3); }
+	| TLPAREN expression TRPAREN { $$ = $2; }
+	;
+    
+numeric: TINTEGER { $$ = new NInteger(atol($1->c_str())); }
+	;
+
+args: args TCOMMA expression { $1->push_back($3); }
+    | /*空*/ { $$ = new ExpressionList(); }
+    | expression { $$ = new ExpressionList(); $$->push_back($1); }
+    ;
+
+comparison: TCEQ | TCNE | TCLT | TCLE | TCGT | TCGE 
+	;
 
 type_specifier: TIDENTIFIER { $$ = new NIdentifier(*$1); }
     ;
