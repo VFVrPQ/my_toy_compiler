@@ -1,1 +1,9 @@
-int x
+/*hhhh*/
+ int x;
+ int y;
+/*ASFSF*/
+/*hhhh123*/
+int main(){ 
+   int a;
+   int x;
+}

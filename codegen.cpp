@@ -1,8 +1,10 @@
 #include "node.h"
 #include "codegen.h"
 #include "parser.hpp"
+#include <set>
 
 using namespace std;
+
 
 /* Compile the AST into a module */
 void CodeGenContext::generateCode(NBlock& root)
@@ -124,12 +126,16 @@ Value* NAssignment::codeGen(CodeGenContext& context)
 	return new StoreInst(rhs.codeGen(context), context.locals()[lhs.name], false, context.currentBlock());
 }
 
+set<std::string> uniq;
 Value* NBlock::codeGen(CodeGenContext& context)
 {
 	StatementList::const_iterator it;
 	Value *last = NULL;
+
+	uniq.clear() ; 
+
 	for (it = statements.begin(); it != statements.end(); it++) {
-		std::cout << "Generating code for " << typeid(**it).name() << endl;
+		std::cout << "Generating code for " << typeid(**it).name() << endl;	
 		last = (**it).codeGen(context);
 	}
 	std::cout << "Creating block" << endl;
@@ -152,7 +158,14 @@ Value* NReturnStatement::codeGen(CodeGenContext& context)
 
 Value* NVariableDeclaration::codeGen(CodeGenContext& context)
 {
-	std::cout << "Creating variable declaration " << type.name << " " << id.name << endl;
+	if (uniq.find(id.name) == uniq.end())
+		std::cout << "Creating variable declaration " << type.name << " " << id.name << endl;
+	else {
+		std::cout << "!!Error:same variable declaration " << id.name << endl;
+		exit(0);
+	}
+	uniq.insert(id.name);
+
 	AllocaInst *alloc = new AllocaInst(typeOf(type), id.name.c_str(), context.currentBlock());
 	context.locals()[id.name] = alloc;
 	if (assignmentExpr != NULL) {
