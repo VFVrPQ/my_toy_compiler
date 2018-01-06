@@ -12,6 +12,7 @@
 %%
 
 [ \t\n  ]					    ;
+"extern"                        return TOKEN(TEXTERN);
 "return"				        return TOKEN(TRETURN);
 "else"                          return TOKEN(TELSE);
 "if"                            return TOKEN(TIF);

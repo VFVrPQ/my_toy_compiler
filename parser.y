@@ -30,7 +30,7 @@
 %token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT TSEMICOLON
 %token <token> TPLUS TMINUS TMUL TDIV
-%token <token> TRETURN TIF TELSE TWHILE
+%token <token> TRETURN TEXTERN TIF TELSE TWHILE
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -42,7 +42,7 @@
 %type <varvec> params param_list
 %type <exprvec> args
 %type <block> program stmts declaration_list
-%type <stmt> stmt declaration var_declaration com_declaration fun_declaration expression_stmt selection_stmt iteration_stmt return_stmt param
+%type <stmt> stmt declaration var_declaration extern_declaration com_declaration fun_declaration expression_stmt selection_stmt iteration_stmt return_stmt param
 %type <token> comparison
 
 /* Operator precedence for mathematical operators */
@@ -57,11 +57,12 @@
 program: declaration_list { programBlock = $1; }
 	;
 		
-declaration_list: declaration_list declaration { $1->statements.push_back($<stmt>2);} 
-	| declaration { $$ = new NBlock(); $$->statements.push_back($<stmt>1);}
+declaration_list: declaration_list declaration { $1->statements.push_back($2); $$ = $1; } 
+	| declaration { $$ = new NBlock(); $$->statements.push_back($1); }
 	;
 
-declaration: var_declaration
+declaration: var_declaration { $$ = $1; } 
+    | extern_declaration { $$ = $1; }
     | fun_declaration 
     | com_declaration
 	;
@@ -74,6 +75,9 @@ type_specifier: TINT { $$ = new NIdentifier(*$1); }
     ;
 
 fun_declaration: type_specifier ident TLPAREN params TRPAREN TLBRACE stmts TRBRACE { $$ = new NFunctionDeclaration(*$1, *$2, *$4, *$7); }
+    ;
+
+extern_declaration: TEXTERN type_specifier ident TLPAREN params TRPAREN TSEMICOLON { $$ = new NExternDeclaration(*$2, *$3, *$5); }
     ;
 
 params: param_list
@@ -136,7 +140,7 @@ comparison: TCEQ | TCNE | TCLT | TCLE | TCGT | TCGE
 	| TPLUS | TMINUS | TMUL | TDIV
 	;
 
-ident: TIDENTIFIER { $$ = new NIdentifier(*$1); delete $1; }
+ident: TIDENTIFIER { $$ = new NIdentifier(*$1); }
     ;
 
 numeric: TINTEGER { $$ = new NInteger(atol($1->c_str())); }
