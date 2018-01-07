@@ -1,6 +1,6 @@
 /* Synax error - Extra else statement on innermost if-then-else
 */
-void main(void)
+void main()
 {
 
 	int x;

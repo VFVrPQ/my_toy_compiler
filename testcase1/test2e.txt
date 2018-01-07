@@ -1,6 +1,6 @@
-/* Semantic error:  The integer variable i is used as a boolean
+/* Semantic error: The integer variable i is used as a boolean
 */
-void main(void)
+void main()
 {
       int i;
       int j;

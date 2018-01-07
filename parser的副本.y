@@ -82,7 +82,11 @@ com_declaration: TCOMMENT { $$ = new NStatement(); }
     ;
 
 fun_declaration: type_specifier ident TLPAREN params TRPAREN TLBRACE stmts TRBRACE { $$ = new NFunctionDeclaration(*$1, *$2, *$4, *$7); }
-	;
+	|type_specifier ident params TRPAREN TLBRACE stmts TRBRACE {std::printf("missing '(' in line %d",lineno);std::exit(0);}
+	|type_specifier ident TLPAREN params  TLBRACE stmts TRBRACE {std::printf("missing ')' in line %d",lineno);std::exit(0);}
+	|type_specifier ident TLPAREN params TRPAREN  stmts TRBRACE {std::printf("missing '{' in line %d",lineno);std::exit(0);}
+	|type_specifier ident TLPAREN params TRPAREN TLBRACE stmts  {std::printf("missing '}' in line %d",lineno);std::exit(0);}
+    ;
 
 params: param_list
     | /*blank*/ { $$ = new VariableList(); }
@@ -103,8 +107,10 @@ stmts: stmt { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
     | iteration_stmt
     ;
 
-bra_stmts: TLBRACE stmts TRBRACE { $$ = $2;}
-	;
+bra_stmts: TLBRACE stmts TRBRACE { $$ = $2; printf("HELLO\n");}
+	| TLBRACE stmts {std::printf("missing '}' in line %d",lineno);std::exit(0);}
+	| stmts TRBRACE {std::printf("1missing '{' in line %d",lineno);std::exit(0);}
+    ;
 
 stmt: var_declaration 
     | expression_stmt 
@@ -115,17 +121,26 @@ stmt: var_declaration
 
 expression_stmt: expression TSEMICOLON { $$ = new NExpressionStatement(*$1); }
     | TSEMICOLON { $$ = new NStatement(); }
+    |expression{std::printf("missing ';' in line %d",lineno);std::exit(0);}
     ;
 
 selection_stmt: TIF TLPAREN expression TRPAREN bra_stmts { $$ = new NSelectionStatement(*$3,*$5); }
     | TIF TLPAREN expression TRPAREN bra_stmts TELSE bra_stmts { $$ = new NSelectionStatement(*$3,*$5,*$7); } 
+    | TIF expression TRPAREN bra_stmts {std::printf("missing '(' in line %d",lineno);std::exit(0);}
+    | TIF TLPAREN expression bra_stmts {std::printf("missing ')' in line %d",lineno);std::exit(0);}
+    | TIF expression TRPAREN bra_stmts TELSE bra_stmts {std::printf("missing '(' in line %d",lineno);std::exit(0);}
+    | TIF TLPAREN expression bra_stmts TELSE bra_stmts {std::printf("missing ')' in line %d",lineno);std::exit(0);}
     ;
 
 iteration_stmt: TWHILE TLPAREN expression TRPAREN bra_stmts { $$ = new NIterationStatement(*$3,*$<block>5); }
+    | TWHILE expression TRPAREN bra_stmts {std::printf("missing '(' in line %d",lineno);std::exit(0);}
+    | TWHILE TLPAREN expression bra_stmts {std::printf("missing ')' in line %d",lineno);std::exit(0);}
     ;
 
 return_stmt: TRETURN TSEMICOLON { $$ = new NReturnStatement(); }
     | TRETURN expression TSEMICOLON {$$ = new NReturnStatement(*$2); }
+    | TRETURN {std::printf("missing ';' in line %d",lineno);std::exit(0);}
+    | TRETURN expression {std::printf("missing ';' in line %d",lineno);std::exit(0);}
     ;
 
 expression: ident TEQUAL expression { $$ = new NAssignment(*$1, *$3); }

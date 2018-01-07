@@ -2,7 +2,7 @@
    Also - several out of bounds array expressions are created
 */
 
-void main(void)
+void main()
 {
    int i;
    int j;

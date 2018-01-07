@@ -6,13 +6,15 @@
 #define SAVE_TOKEN  yylval.string = new std::string(yytext, yyleng)
 #define TOKEN(t)    (yylval.token = t)
 #define SAVE_LINE   yylval.yylineno = yylineno
+
+int lineno = 0;
 %}
 
 %option noyywrap
 %option yylineno
 %%
 
-[ \t\n  ]					    ;
+[ \t\r]					        ;
 "extern"                        return TOKEN(TEXTERN);
 "return"				        return TOKEN(TRETURN);
 "else"                          return TOKEN(TELSE);
@@ -45,7 +47,19 @@
 "-"		          				return TOKEN(TMINUS);
 "*"		          				return TOKEN(TMUL);
 "/"				          		return TOKEN(TDIV);
+"\n"       {lineno++;};
 
-.                       printf("Unknown token:$$$%s$$$\n",yytext); yyterminate();
+"/*"             { char c; 
+                  char p='\0';
+                  do
+                  { c = getchar();
+                    if (c == EOF) break;
+                    if (c == '\n') lineno++;
+                    if (p == '*' && c == '/') break;
+                    p = c;
+                  } while (1);
+                }
+                
+.               printf("Unknown token:$$$%s$$$:%d\n",yytext,lineno); yyterminate();
 
 %%

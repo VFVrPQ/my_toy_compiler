@@ -38,8 +38,7 @@ class CodeGenContext {
 public:
 
     Module *module;
-    IRBuilder<> builder;
-    CodeGenContext() :builder(MyContext) { module = new Module("main", MyContext); }
+    CodeGenContext() { module = new Module("main", MyContext); }
     
     void generateCode(NBlock& root);
     GenericValue runCode();

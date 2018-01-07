@@ -5,7 +5,7 @@
 
 using namespace std;
 
-
+#define ISTYPE(value, id) (value->getType()->getTypeID() == id)
 static Type *typeOf(const NIdentifier& type) ;
 
 int flag = 0;
@@ -179,10 +179,22 @@ Value* NIterationStatement::codeGen(CodeGenContext& context)
     return nullptr;
 }
 
+/*static Value* CastToBoolean(CodeGenContext& context, Value* condValue){
+
+    if( ISTYPE(condValue, Type::IntegerTyID) ){
+        condValue = context.builder.CreateIntCast(condValue, Type::getInt1Ty(context.llvmContext), true);
+        return context.builder.CreateICmpNE(condValue, ConstantInt::get(Type::getInt1Ty(context.llvmContext), 0, true));
+    }else if( ISTYPE(condValue, Type::DoubleTyID) ){
+        return context.builder.CreateFCmpONE(condValue, ConstantFP::get(context.llvmContext, APFloat(0.0)));
+    }else{
+        return condValue;
+    }
+}*/
+
 Value* NSelectionStatement::codeGen(CodeGenContext& context)
 {	
 	cout << "Generating if statement" << endl;
-    Value* condValue = this->condition.codeGen(context);
+  /*  Value* condValue = this->condition.codeGen(context);
     if( !condValue )
         return nullptr;
 
@@ -228,7 +240,7 @@ Value* NSelectionStatement::codeGen(CodeGenContext& context)
     }
 
     theFunction->getBasicBlockList().push_back(mergeBB);        //
-    context.builder.SetInsertPoint(mergeBB);        //
+    context.builder.SetInsertPoint(mergeBB);        //*/
 
     return nullptr;
 }

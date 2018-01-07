@@ -1,7 +1,7 @@
 /* Syntax error:  '}' is missing on the inner loop
 */
 
-void main(void)
+void main()
 {
     int i;
     int j;
