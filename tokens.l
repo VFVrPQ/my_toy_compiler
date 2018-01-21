@@ -1,3 +1,27 @@
+#define MAXTOKENSIZE 50
+typedef int TokenType;    /*定义语法树结构*/
+typedef struct
+{
+  TokenType tok;
+  char * tokString;
+} TokenStruct;
+
+typedef enum {IfK,WhileK,AssignK,ReturnK,CallK,
+VarDeclK,FunDeclK,OpK,ConstK,IdK} NodeKind;    /*枚举结点类型*/
+
+typedef enum {Void,Integer,Boolean} ExpType;  /*枚举返回变量类型*/
+#define MAXCHILDREN 3        /*声明一个结点最多有三个子结点*/
+typedef struct treeNode         /*定义语法树结点结构*/
+{ struct treeNode * child[MAXCHILDREN];
+  struct treeNode * sibling;
+  int lineno;
+  NodeKind kind;
+  union { TokenType op;
+    int val;
+    char * name; } attr;
+  ExpType type;
+ } TreeNode;
+
 %{
 #include <string>
 #include "node.h"
@@ -7,14 +31,13 @@
 #define TOKEN(t)    (yylval.token = t)
 #define SAVE_LINE   yylval.yylineno = yylineno
 
-int lineno = 0;
 %}
 
 %option noyywrap
 %option yylineno
 %%
 
-[ \t\r]					        ;
+[ \t\r\n]					      ;
 "extern"                        return TOKEN(TEXTERN);
 "return"				        return TOKEN(TRETURN);
 "else"                          return TOKEN(TELSE);
@@ -47,19 +70,7 @@ int lineno = 0;
 "-"		          				return TOKEN(TMINUS);
 "*"		          				return TOKEN(TMUL);
 "/"				          		return TOKEN(TDIV);
-"\n"       {lineno++;};
 
-"/*"             { char c; 
-                  char p='\0';
-                  do
-                  { c = getchar();
-                    if (c == EOF) break;
-                    if (c == '\n') lineno++;
-                    if (p == '*' && c == '/') break;
-                    p = c;
-                  } while (1);
-                }
-                
-.               printf("Unknown token:$$$%s$$$:%d\n",yytext,lineno); yyterminate();
+.               printf("Unknown token:$$$%s$$$:%d\n",yytext,yylineno); yyterminate();
 
 %%

@@ -238,3 +238,136 @@ com_declaration: TCOMMENT { $$ = new NStatement(); }
     ;
 %%
 ```
+
+
+垃圾llvm，好点的文档都没有
+http://www.codeweblog.com/用llvm来开发自己的编译器-一-变量和函数/
+
+```
+> LLVMContext: 线程上下文，通个getGlobalContext获得
+> Module: 模块，可以看成是变量、函数和类型的集合，一般对应一个文件
+> Function: 函数
+> Type: 数据类型如i64、double、i64、double等
+> Value: 可以看成是个变量如上面的%a、%1等
+> BasicBlock: 基本块，如上面的entry,在IR里类型是label,可以看成是指令的集合，但必须以return、br等跳转类指令结束
+> IRBuilder: 是一个辅助类，提供便捷的api插入指令
+```
+
+---
+
+## 变量的处理
+
+### 函数外声明的是全局变量，函数内声明的都是局部变量
+```
+全局的变量 : Value *var = new GlobalVariable(module,type,false,GlobalValue::ExternalLinkage,initial);
+创建一个局部变量 : Value *var = irBuilder.CreateAlloca(type);
+
+要用load和store来进行取值和赋值:
+Value *val = irBuilder.CreateLoad(var)
+irBuilder.CreateStore(val,var)
+
+```
+
+---
+
+## 函数的处理
+```
+vector<Type*> argTypes;
+argTypes.push_back(builder.getInt64Ty());
+ArrayRef<Type*> argTypesRef(argTypes);
+FunctionType *funcType = FunctionType::get(builder.getVoidTy(),argTypesRef,false);
+Function *func = Function::Create(funcType,Function::ExternalLinkage,"funcA",&module);
+```
+BasicBlock *bb = BasicBlock::Create(context,"label1",func);
+builder.SetInsertPoint(bb);
+
+函数体就是BasicBlock的集合，可以用BasicBlock *bb = BasicBlock::Create(context,"label1",func)在函数体的最后创建一个BasicBlock。把IRBuilder的插入点设置成相应BasicBlock，后面用builder创建的指令都会追加到这个BasicBlock里了。
+
+
+
+### **取出Integer的值**
+```
+ConstantInt::get(Type::getInt64Ty(context.llvmContext), value, true);
+```
+### **取出Double的值**
+```
+ConstantFP::get(Type::getDoubleTy(context.llvmContext), value)
+```
+
+### **取出Identifier的值:**
+```
+new LoadInst(context.locals()[name], "", false, context.currentBlock())
+```
+
+### **创建call**
+```
+CallInst::Create(function, makeArrayRef(args), "", context.currentBlock())
+```
+
+### **创建+-*/**
+```
+BinaryOperator::Create(Instruction::Add, lhs.codeGen(context), 
+		rhs.codeGen(context), "", context.currentBlock());
+```
+
+### **定义**
+```
+AllocaInst *alloc = new AllocaInst(typeOf(context,type), id.name.c_str(), context.currentBlock());
+```
+
+### **创建fuzhi语句**
+```
+new StoreInst(rhs.codeGen(context), context.locals()[lhs.name], false, context.currentBlock())
+
+argumentValue = &*argsValues++;
+argumentValue->setName((*it)->id.name.c_str());
+StoreInst *inst = new StoreInst(argumentValue, context.locals()[(*it)->id.name], false, bblock);
+```
+
+### **创建return Statement**
+```
+Value *returnValue = expression.codeGen(context);
+context.setCurrentReturnValue(returnValue);
+```
+
+### **创建externFunction**
+```
+    vector<Type*> argTypes;
+    VariableList::const_iterator it;
+    for (it = arguments.begin(); it != arguments.end(); it++) {
+        argTypes.push_back(typeOf(context,(**it).type));
+    }
+    FunctionType *ftype = FunctionType::get(typeOf(context,type), makeArrayRef(argTypes), false);
+    Function *function = Function::Create(ftype, GlobalValue::ExternalLinkage, id.name.c_str(), context.module);
+
+    return function;
+```
+
+### **创建function**
+```
+    vector<Type*> argTypes;
+	VariableList::const_iterator it;
+	for (it = arguments.begin(); it != arguments.end(); it++) {
+		argTypes.push_back(typeOf(context,(**it).type));
+	}
+	FunctionType *ftype = FunctionType::get(typeOf(context,type), makeArrayRef(argTypes), false);
+	Function *function = Function::Create(ftype, GlobalValue::InternalLinkage, id.name.c_str(), context.module);
+	BasicBlock *bblock = BasicBlock::Create(context.llvmContext, "entry", function, 0);
+    context.pushBlock(bblock);
+    Function::arg_iterator argsValues = function->arg_begin();
+    Value* argumentValue;
+
+	for (it = arguments.begin(); it != arguments.end(); it++) {
+		(**it).codeGen(context);
+		
+		argumentValue = &*argsValues++;
+		argumentValue->setName((*it)->id.name.c_str());
+		StoreInst *inst = new StoreInst(argumentValue, context.locals()[(*it)->id.name], false, bblock);
+	}
+	
+	block.codeGen(context);
+	ReturnInst::Create(context.llvmContext, context.getCurrentReturnValue(), bblock);
+
+	context.popBlock();
+	
+```

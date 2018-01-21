@@ -100,21 +100,22 @@ public:
 };
 
 //new
-class NSelectionStatement : public NBlock {
+class NSelectionStatement : public NStatement {
 public:
 	NExpression& condition;
 	NBlock& trueBlock;
-	NBlock  falseBlock;
+	NBlock*  falseBlock;
 	NSelectionStatement(NExpression& condition, NBlock& trueBlock) :
-		condition(condition), trueBlock(trueBlock) {}
-	NSelectionStatement(NExpression& condition, NBlock& trueBlock, NBlock falseBlock) :
-		condition(condition), trueBlock(trueBlock),falseBlock(falseBlock) {}	
+		condition(condition), trueBlock(trueBlock) {falseBlock = NULL ;}
+	NSelectionStatement(NExpression& condition, NBlock& trueBlock, NBlock& falseBlock2) :
+		condition(condition), trueBlock(trueBlock) {falseBlock = &falseBlock2;
+		}	
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 
 };
 
 //new
-class NIterationStatement : public NBlock {
+class NIterationStatement : public NStatement {
 public:
 	NExpression& expression;
 	NBlock& block;

@@ -6,7 +6,7 @@
 using namespace std;
 
 #define ISTYPE(value, id) (value->getType()->getTypeID() == id)
-static Type *typeOf(const NIdentifier& type) ;
+static Type *typeOf(CodeGenContext& context,const NIdentifier& type) ;
 
 int flag = 0;
 int mainFunctionNum = 0;
@@ -18,14 +18,14 @@ void CodeGenContext::generateCode(NBlock& root)
 	
 	/* Create the top level interpreter function to call as entry */
 	vector<Type*> argTypes;
-	FunctionType *ftype = FunctionType::get(Type::getVoidTy(MyContext), makeArrayRef(argTypes), false);
+	FunctionType *ftype = FunctionType::get(Type::getVoidTy(llvmContext), makeArrayRef(argTypes), false);
 	mainFunction = Function::Create(ftype, GlobalValue::InternalLinkage, "bigmain", module);
-	BasicBlock *bblock = BasicBlock::Create(MyContext, "entry", mainFunction, 0);
+	BasicBlock *bblock = BasicBlock::Create(llvmContext, "entry", mainFunction, 0);
 	
 	/* Push a new variable/block context */
 	pushBlock(bblock);
-	root.codeGen(*this); /* emit bytecode for the toplevel block */
-	ReturnInst::Create(MyContext, bblock);
+	root.codeGen(*this); /* emit bytecode for the toplevel block */ //递归
+	ReturnInst::Create(llvmContext, bblock); // 代码生成
 	popBlock();
 	
 	/* Print the bytecode in a human-readable format 
@@ -60,15 +60,15 @@ GenericValue CodeGenContext::runCode() {
 }
 
 /* Returns an LLVM type based on the identifier */
-static Type *typeOf(const NIdentifier& type) 
+static Type *typeOf(CodeGenContext& context,const NIdentifier& type) 
 {
 	if (type.name.compare("int") == 0) {
-		return Type::getInt64Ty(MyContext);
+		return Type::getInt64Ty(context.llvmContext);
 	}
 	else if (type.name.compare("double") == 0) {
-		return Type::getDoubleTy(MyContext);
+		return Type::getDoubleTy(context.llvmContext);
 	}
-	return Type::getVoidTy(MyContext);
+	return Type::getVoidTy(context.llvmContext);
 }
 
 /* -- Code Generation -- */
@@ -76,13 +76,13 @@ static Type *typeOf(const NIdentifier& type)
 Value* NInteger::codeGen(CodeGenContext& context)
 {
 	std::cout << "Creating integer: " << value << endl;
-	return ConstantInt::get(Type::getInt64Ty(MyContext), value, true);
+	return ConstantInt::get(Type::getInt64Ty(context.llvmContext), value, true);
 }
 
 Value* NDouble::codeGen(CodeGenContext& context)
 {
 	std::cout << "Creating double: " << value << endl;
-	return ConstantFP::get(Type::getDoubleTy(MyContext), value);
+	return ConstantFP::get(Type::getDoubleTy(context.llvmContext), value);
 }
 
 Value* NIdentifier::codeGen(CodeGenContext& context)
@@ -116,6 +116,7 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context)
 	std::cout << "Creating binary operation " << op << endl;
 	
 	Instruction::BinaryOps instr;
+	CmpInst::Predicate com;
 	switch (op) {
 		case TPLUS: 	instr = Instruction::Add; goto math;
 		case TMINUS: 	instr = Instruction::Sub; goto math;
@@ -123,11 +124,29 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context)
 		case TDIV: 		instr = Instruction::SDiv; goto math;
 				
 		/* TODO comparison */
+		/*
+		"=="				          	return TOKEN(TCEQ);
+		"!="			          		return TOKEN(TCNE);
+		"<"				          		return TOKEN(TCLT);
+		"<="	          				return TOKEN(TCLE);
+		">"				          		return TOKEN(TCGT);
+		">="					        return TOKEN(TCGE);
+		*/
+		case TCEQ:		com = CmpInst::ICMP_EQ; goto compare;
+		case TCNE:		com = CmpInst::ICMP_NE; goto compare;
+		case TCLT:		com = CmpInst::ICMP_SLT;goto compare;
+		case TCLE:		com = CmpInst::ICMP_SLE;goto compare;
+		case TCGT:		com = CmpInst::ICMP_SGT;goto compare;
+		case TCGE:		com = CmpInst::ICMP_SGE;goto compare;
 	}
-
 	return NULL;
 math:
 	return BinaryOperator::Create(instr, lhs.codeGen(context), 
+		rhs.codeGen(context), "", context.currentBlock());
+compare:
+//Create (OtherOps Op, Predicate predicate, Value *S1, Value *S2, const Twine &Name, BasicBlock *InsertAtEnd)
+//ICmpInst (BasicBlock &InsertAtEnd, Predicate pred, Value *LHS, Value *RHS, const Twine &NameStr="")
+	return CmpInst::Create(*(new Instruction::OtherOps), com, lhs.codeGen(context), 
 		rhs.codeGen(context), "", context.currentBlock());
 }
 
@@ -179,7 +198,7 @@ Value* NIterationStatement::codeGen(CodeGenContext& context)
     return nullptr;
 }
 
-/*static Value* CastToBoolean(CodeGenContext& context, Value* condValue){
+static Value* CastToBoolean(CodeGenContext& context, Value* condValue){
 
     if( ISTYPE(condValue, Type::IntegerTyID) ){
         condValue = context.builder.CreateIntCast(condValue, Type::getInt1Ty(context.llvmContext), true);
@@ -187,62 +206,57 @@ Value* NIterationStatement::codeGen(CodeGenContext& context)
     }else if( ISTYPE(condValue, Type::DoubleTyID) ){
         return context.builder.CreateFCmpONE(condValue, ConstantFP::get(context.llvmContext, APFloat(0.0)));
     }else{
+		std::cout<< "no castToBoolean" <<std::endl;
         return condValue;
     }
-}*/
+}
 
 Value* NSelectionStatement::codeGen(CodeGenContext& context)
 {	
 	cout << "Generating if statement" << endl;
-  /*  Value* condValue = this->condition.codeGen(context);
-    if( !condValue )
-        return nullptr;
 
-    condValue = CastToBoolean(context, condValue);
+	Value* condValue = condition.codeGen(context);
+	if (!condValue) {
+		std::cout<< "No condValue" <<std::endl;
+		return nullptr;
+	}
 
-    Function* theFunction = context.builder.GetInsertBlock()->getParent();      // the function where if statement is in
+	condValue = CastToBoolean(context, condValue);
 
-    BasicBlock *thenBB = BasicBlock::Create(context.llvmContext, "then", theFunction);
-    BasicBlock *falseBB = BasicBlock::Create(context.llvmContext, "else");
-    BasicBlock *mergeBB = BasicBlock::Create(context.llvmContext, "ifcont");
+	Function* theFunction = context.currentBlock()->getParent();
+	BasicBlock *ifTrue = BasicBlock::Create(context.llvmContext, "then", theFunction, 0);
+	BasicBlock *ifFalse = BasicBlock::Create(context.llvmContext, "else");
+	BasicBlock *mergeBB = BasicBlock::Create(context.llvmContext, "ifcont");
 
-    if( this->falseBlock ){
-        context.builder.CreateCondBr(condValue, thenBB, falseBB);
-    } else{
-        context.builder.CreateCondBr(condValue, thenBB, mergeBB);
-    }
+	Value *last = NULL;
+	if (falseBlock){
+		 BranchInst::Create(ifTrue, ifFalse, condValue, context.currentBlock() );
+	}else{
+		 BranchInst::Create(ifTrue, mergeBB, condValue, context.currentBlock() );
+	}
 
-    context.builder.SetInsertPoint(thenBB);
+	//context.builder.SetInsertPoint(ifTrue);
+	context.pushBlock(ifTrue);
+	last = trueBlock.codeGen(context);
+	last = BranchInst::Create(mergeBB, context.currentBlock());
+	context.popBlock();
+	//std::cout<< ifTrue->getParent() << std::endl;
 
-    context.pushBlock(thenBB);
-
-    this->trueBlock->codeGen(context);
-
-    context.popBlock();
-
-    thenBB = context.builder.GetInsertBlock();
-
-    if( thenBB->getTerminator() == nullptr ){       //
-        context.builder.CreateBr(mergeBB);
-    }
-
-    if( this->falseBlock ){
-        theFunction->getBasicBlockList().push_back(falseBB);    //
-        context.builder.SetInsertPoint(falseBB);            //
-
-        context.pushBlock(thenBB);
-
-        this->falseBlock->codeGen(context);
-
-        context.popBlock();
-
-        context.builder.CreateBr(mergeBB);
-    }
+	if (falseBlock){
+   		theFunction->getBasicBlockList().push_back(ifFalse);        //
+    	context.builder.SetInsertPoint(ifFalse);
+		context.pushBlock(ifFalse);
+		last = falseBlock->codeGen(context);
+		last = BranchInst::Create(mergeBB, context.currentBlock());
+		context.popBlock();
+	}
 
     theFunction->getBasicBlockList().push_back(mergeBB);        //
-    context.builder.SetInsertPoint(mergeBB);        //*/
+    context.builder.SetInsertPoint(mergeBB);
+	ReturnInst::Create(context.llvmContext, mergeBB); //for test
+	//context.pushBlock(mergeBB);
 
-    return nullptr;
+	return last;
 }
 
 Value* NVariableDeclaration::codeGen(CodeGenContext& context)
@@ -255,7 +269,7 @@ Value* NVariableDeclaration::codeGen(CodeGenContext& context)
 	}
 	uniq.insert(id.name);
 
-	AllocaInst *alloc = new AllocaInst(typeOf(type), id.name.c_str(), context.currentBlock());
+	AllocaInst *alloc = new AllocaInst(typeOf(context,type), id.name.c_str(), context.currentBlock());
 	context.locals()[id.name] = alloc;
 	if (assignmentExpr != NULL) {
 		NAssignment assn(id, *assignmentExpr);
@@ -269,9 +283,9 @@ Value* NExternDeclaration::codeGen(CodeGenContext& context)
     vector<Type*> argTypes;
     VariableList::const_iterator it;
     for (it = arguments.begin(); it != arguments.end(); it++) {
-        argTypes.push_back(typeOf((**it).type));
+        argTypes.push_back(typeOf(context,(**it).type));
     }
-    FunctionType *ftype = FunctionType::get(typeOf(type), makeArrayRef(argTypes), false);
+    FunctionType *ftype = FunctionType::get(typeOf(context,type), makeArrayRef(argTypes), false);
     Function *function = Function::Create(ftype, GlobalValue::ExternalLinkage, id.name.c_str(), context.module);
 
     return function;
@@ -282,11 +296,11 @@ Value* NFunctionDeclaration::codeGen(CodeGenContext& context)
 	vector<Type*> argTypes;
 	VariableList::const_iterator it;
 	for (it = arguments.begin(); it != arguments.end(); it++) {
-		argTypes.push_back(typeOf((**it).type));
+		argTypes.push_back(typeOf(context,(**it).type));
 	}
-	FunctionType *ftype = FunctionType::get(typeOf(type), makeArrayRef(argTypes), false);
+	FunctionType *ftype = FunctionType::get(typeOf(context,type), makeArrayRef(argTypes), false);
 	Function *function = Function::Create(ftype, GlobalValue::InternalLinkage, id.name.c_str(), context.module);
-	BasicBlock *bblock = BasicBlock::Create(MyContext, "entry", function, 0);
+	BasicBlock *bblock = BasicBlock::Create(context.llvmContext, "entry", function, 0);
 
 	if (id.name == "main" && !flag){
 		myMainFunction = function;
@@ -297,6 +311,7 @@ Value* NFunctionDeclaration::codeGen(CodeGenContext& context)
 	Function::arg_iterator argsValues = function->arg_begin();
     Value* argumentValue;
 
+	uniq.clear();
 	for (it = arguments.begin(); it != arguments.end(); it++) {
 		(**it).codeGen(context);
 		
@@ -306,7 +321,7 @@ Value* NFunctionDeclaration::codeGen(CodeGenContext& context)
 	}
 	
 	block.codeGen(context);
-	ReturnInst::Create(MyContext, context.getCurrentReturnValue(), bblock);
+	ReturnInst::Create(context.llvmContext, context.getCurrentReturnValue(), bblock);
 
 	context.popBlock();
 	std::cout << "Creating function: " << id.name << endl;

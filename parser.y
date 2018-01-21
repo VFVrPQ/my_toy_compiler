@@ -4,9 +4,9 @@
         #include <cstdlib>
 	NBlock *programBlock; /* the top level root node of our final AST */
 
-    extern int lineno;
+    extern int yylineno;
 	extern int yylex();
-	void yyerror(const char *s) { std::printf("Error: %s in line %d\n", s,lineno);std::exit(1); }
+	void yyerror(const char *s) { std::printf("Error: %s in line %d\n", s,yylineno);std::exit(1); }
 %}
 
 /* Represents the many different ways we can access our data */
@@ -39,18 +39,19 @@
    calling an (NIdentifier*). It makes the compiler happy.
  */
 %type <ident> ident type_specifier
-%type <block> program declaration_list stmts selection_stmt iteration_stmt bra_stmts
+%type <block> program declaration_list stmts
 %type <varvec> params param_list
 %type <exprvec> args
 %type <stmt>  declaration var_declaration extern_declaration com_declaration fun_declaration
-%type <stmt> stmt expression_stmt return_stmt param
+%type <stmt> stmt expression_stmt return_stmt param selection_stmt iteration_stmt
 %type <expr> expression numeric
 %type <token> comparison
 
 /* Operator precedence for mathematical operators */
+%right TEQUAL
+%left TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
 %left TMUL TDIV
-
 
 %start program
 
@@ -69,13 +70,12 @@ declaration: var_declaration
     | fun_declaration
     ;
 
-
 var_declaration: type_specifier ident TSEMICOLON { $$ = new NVariableDeclaration(*$<ident>1, *$2); }
-	|type_specifier ident {std::printf("missing ';' in line %d",lineno);std::exit(0);}
+	| type_specifier ident {std::printf("missing ';' in line %d",yylineno);std::exit(0);}
 	;
 
 extern_declaration: TEXTERN type_specifier ident TLPAREN params TRPAREN TSEMICOLON { $$ = new NExternDeclaration(*$2, *$3, *$5); }
-	|TEXTERN type_specifier ident TLPAREN params TRPAREN{std::printf("missing ';' in line %d",lineno);std::exit(0);}
+	|TEXTERN type_specifier ident TLPAREN params TRPAREN { std::printf("missing ';' in line %d",yylineno);std::exit(0);}
     ;
 
 com_declaration: TCOMMENT { $$ = new NStatement(); }
@@ -97,19 +97,24 @@ param: type_specifier ident { $$ = new NVariableDeclaration(*$1,*$2); }
     ;
 
 stmts: stmt { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
-    | stmts stmt { $1->statements.push_back($<stmt>2); }
-	| stmts com_declaration { $$ = $1; } 
-    | selection_stmt
-    | iteration_stmt
+    | stmts stmt { $1->statements.push_back($<stmt>2); $$ = $1; }
+    | TLBRACE stmts TRBRACE { $$ = $2; }
+    | stmts TLBRACE stmts TRBRACE { 
+        $$ = $1; 
+        for (int i=0;i<($3->statements).size();i++){
+            $$->statements.push_back($3->statements[i]);
+        }
+        delete $3;
+    }
     ;
 
-bra_stmts: TLBRACE stmts TRBRACE { $$ = $2;}
-	;
 
 stmt: var_declaration 
     | expression_stmt 
-    | bra_stmts
     | return_stmt
+    | selection_stmt
+    | iteration_stmt
+    | com_declaration
     | /*空*/ { $$ = new NStatement();}
     ;
 
@@ -117,11 +122,11 @@ expression_stmt: expression TSEMICOLON { $$ = new NExpressionStatement(*$1); }
     | TSEMICOLON { $$ = new NStatement(); }
     ;
 
-selection_stmt: TIF TLPAREN expression TRPAREN bra_stmts { $$ = new NSelectionStatement(*$3,*$5); }
-    | TIF TLPAREN expression TRPAREN bra_stmts TELSE bra_stmts { $$ = new NSelectionStatement(*$3,*$5,*$7); } 
+selection_stmt: TIF TLPAREN expression TRPAREN TLBRACE stmts TRBRACE TELSE TLBRACE stmts TRBRACE { $$ = new NSelectionStatement(*$3,*$6,*$10); } 
+    | TIF TLPAREN expression TRPAREN TLBRACE stmts TRBRACE {printf("select_stmt2\n");$$ = new NSelectionStatement(*$3,*$6); }
     ;
 
-iteration_stmt: TWHILE TLPAREN expression TRPAREN bra_stmts { $$ = new NIterationStatement(*$3,*$<block>5); }
+iteration_stmt: TWHILE TLPAREN expression TRPAREN TLBRACE stmts TRBRACE { $$ = new NIterationStatement(*$3,*$<block>6); }
     ;
 
 return_stmt: TRETURN TSEMICOLON { $$ = new NReturnStatement(); }

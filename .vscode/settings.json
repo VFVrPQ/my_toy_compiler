@@ -20,6 +20,21 @@
         "ratio": "cpp",
         "tuple": "cpp",
         "type_traits": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "algorithm": "cpp",
+        "atomic": "cpp",
+        "bitset": "cpp",
+        "locale": "cpp",
+        "system_error": "cpp",
+        "__functional_03": "cpp",
+        "__config": "cpp",
+        "__nullptr": "cpp",
+        "exception": "cpp",
+        "new": "cpp",
+        "stdexcept": "cpp",
+        "typeinfo": "cpp",
+        "__locale": "cpp",
+        "__string": "cpp",
+        "iosfwd": "cpp"
     }
 }
