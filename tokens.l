@@ -1,5 +1,6 @@
+%{
 #define MAXTOKENSIZE 50
-typedef int TokenType;    /*定义语法树结构*/
+typedef int TokenType;
 typedef struct
 {
   TokenType tok;
@@ -7,11 +8,11 @@ typedef struct
 } TokenStruct;
 
 typedef enum {IfK,WhileK,AssignK,ReturnK,CallK,
-VarDeclK,FunDeclK,OpK,ConstK,IdK} NodeKind;    /*枚举结点类型*/
+VarDeclK,FunDeclK,OpK,ConstK,IdK} NodeKind;
 
-typedef enum {Void,Integer,Boolean} ExpType;  /*枚举返回变量类型*/
-#define MAXCHILDREN 3        /*声明一个结点最多有三个子结点*/
-typedef struct treeNode         /*定义语法树结点结构*/
+typedef enum {Void,Integer,Boolean} ExpType;
+#define MAXCHILDREN 3
+typedef struct treeNode
 { struct treeNode * child[MAXCHILDREN];
   struct treeNode * sibling;
   int lineno;
@@ -21,6 +22,7 @@ typedef struct treeNode         /*定义语法树结点结构*/
     char * name; } attr;
   ExpType type;
  } TreeNode;
+%}
 
 %{
 #include <string>
