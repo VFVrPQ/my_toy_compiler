@@ -92,7 +92,7 @@ Value* NIdentifier::codeGen(CodeGenContext& context)
 		std::cerr << "undeclared variable " << name << endl;
 		return NULL;
 	}
-	return new LoadInst(context.locals()[name], "", false, context.currentBlock());
+	return new LoadInst(context.locals()[name]->getType()->getPointerElementType(), context.locals()[name], "", false, context.currentBlock());
 }
 
 Value* NMethodCall::codeGen(CodeGenContext& context)
@@ -268,7 +268,7 @@ Value* NVariableDeclaration::codeGen(CodeGenContext& context)
 	}
 	uniq.insert(id.name);
 
-	AllocaInst *alloc = new AllocaInst(typeOf(context,type), id.name.c_str(), context.currentBlock());
+	AllocaInst *alloc = new AllocaInst(typeOf(context,type), NULL, id.name.c_str(), context.currentBlock());
 	context.locals()[id.name] = alloc;
 	if (assignmentExpr != NULL) {
 		NAssignment assn(id, *assignmentExpr);
