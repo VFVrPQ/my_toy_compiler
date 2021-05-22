@@ -3,3 +3,7 @@ parser.cpp
 parser.hpp
 tokens.cpp
 parser
+*.log
+*.json
+**/.DS_Store
+.vscode/*
